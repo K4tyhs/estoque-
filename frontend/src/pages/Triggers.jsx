@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { IconAlert, IconCheck } from '../components/Icons';
 
 export default function Triggers() {
   const [config, setConfig] = useState(null);
@@ -28,9 +29,9 @@ export default function Triggers() {
     try {
       const { data } = await api.put('/triggers', updates);
       setConfig(data.config);
-      showToast('Configuração salva!');
+      showToast('Configuração salva com sucesso!');
     } catch (err) {
-      showToast(err.response?.data?.error || 'Erro', 'error');
+      showToast(err.response?.data?.error || 'Erro ao salvar configuração', 'error');
     } finally { setSaving(false); }
   };
 
@@ -38,33 +39,33 @@ export default function Triggers() {
     try {
       await api.put(`/triggers/item/${itemId}`, { minimum_quantity });
       setItems(prev => prev.map(i => i.id === itemId ? { ...i, minimum_quantity } : i));
-      showToast('Limite atualizado!');
+      showToast('Limite mínimo atualizado!');
     } catch (err) {
-      showToast(err.response?.data?.error || 'Erro', 'error');
+      showToast(err.response?.data?.error || 'Erro ao atualizar limite', 'error');
     }
   };
 
-  if (loading) return <div className="loading-center"><div className="spinner"></div></div>;
+  if (loading) return <div className="loading-center"><div className="spinner"></div><span>Carregando triggers...</span></div>;
 
   return (
     <div className="page-container fade-in">
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999 }}>
-          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280 }}>
-            {toast.type === 'error' ? '⚠️' : '✅'} {toast.msg}
+          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280, boxShadow: 'var(--shadow)' }}>
+            {toast.type === 'error' ? <IconAlert /> : <IconCheck />} {toast.msg}
           </div>
         </div>
       )}
 
       <div className="page-header">
-        <h1 className="page-title">⚡ Painel de Triggers</h1>
-        <p className="page-subtitle">Gerencie as automações do sistema · Todos desativados por padrão</p>
+        <h1 className="page-title">Painel de Triggers e Regras</h1>
+        <p className="page-subtitle">Gerencie as regras de automação e limites mínimos de estoque</p>
       </div>
 
       <div className="card mb-24">
-        <div className="section-title mb-16">🌐 Controles Globais</div>
+        <div className="section-title mb-16">Controles Globais de Automação</div>
         <div className="alert alert-warning mb-16">
-          ⚠️ Ative apenas após configurar as variáveis de ambiente (EMAIL e JIRA) no arquivo .env do backend.
+          <IconAlert /> Ative as integrações apenas após configurar as variáveis de ambiente de e-mail e JIRA no servidor.
         </div>
 
         <div className="flex-col gap-16">
@@ -72,7 +73,7 @@ export default function Triggers() {
             <div className="flex items-center justify-between">
               <div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>Automações Globais</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Master switch — desligar aqui desativa tudo</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Master Switch - Desabilitar aqui suspende todos os triggers automáticos</div>
               </div>
               <div className="toggle-wrapper">
                 <span style={{ fontSize: 12, color: config.is_globally_active ? 'var(--status-normal)' : 'var(--text-muted)' }}>
@@ -90,8 +91,8 @@ export default function Triggers() {
           <div style={{ padding: '16px 20px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: config.is_globally_active ? 1 : 0.5 }}>
             <div className="flex items-center justify-between">
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>📧 Alertas por Email</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Envia email para ti@farmarcas.com.br quando estoque atingir o mínimo</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Alertas por E-mail</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Envia notificação para ti@farmarcas.com.br quando o estoque atingir o limite mínimo</div>
               </div>
               <div className="toggle-wrapper">
                 <span style={{ fontSize: 12, color: config.email_alerts_active ? 'var(--status-normal)' : 'var(--text-muted)' }}>
@@ -109,8 +110,8 @@ export default function Triggers() {
           <div style={{ padding: '16px 20px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', opacity: config.is_globally_active ? 1 : 0.5 }}>
             <div className="flex items-center justify-between">
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>🔵 Integração JIRA</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Cria tarefa no JIRA automaticamente ao confirmar pedido de compra</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Integração JIRA</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Cria tarefa de compra no JIRA automaticamente ao confirmar pedido</div>
               </div>
               <div className="toggle-wrapper">
                 <span style={{ fontSize: 12, color: config.jira_integration_active ? 'var(--status-normal)' : 'var(--text-muted)' }}>
@@ -128,16 +129,16 @@ export default function Triggers() {
           <div style={{ padding: '16px 20px', background: 'var(--bg-input)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>📅 Cobertura do Estoque</div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Dias de consumo que o pedido preditivo deve cobrir</div>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Projeção de Cobertura do Estoque</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Dias de consumo projetados para o cálculo automático do pedido de compra</div>
               </div>
               <div className="flex items-center gap-8">
                 <input
-                  type="number" min="30" max="90"
+                  type="number" min="15" max="90"
                   className="form-input"
                   style={{ width: 80, textAlign: 'center' }}
                   value={config.coverage_days}
-                  onChange={e => setConfig({ ...config, coverage_days: parseInt(e.target.value) })}
+                  onChange={e => setConfig({ ...config, coverage_days: parseInt(e.target.value) || 45 })}
                 />
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>dias</span>
                 <button
@@ -156,8 +157,8 @@ export default function Triggers() {
       <div className="card">
         <div className="section-header">
           <div>
-            <div className="section-title">📊 Limites Mínimos por Item</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Altere o valor e pressione Enter ou clique fora para salvar</div>
+            <div className="section-title">Limites Mínimos por Item de Estoque</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Clique no valor para editar o estoque mínimo de cada item</div>
           </div>
         </div>
         <div className="table-wrapper">
@@ -189,7 +190,7 @@ export default function Triggers() {
                     </td>
                     <td>
                       <span className={`badge badge-${status.toLowerCase()}`}>
-                        {status === 'CRITICAL' ? '🔴 Crítico' : status === 'ALERT' ? '⚠️ Alerta' : '✓ Normal'}
+                        {status === 'CRITICAL' ? 'Crítico' : status === 'ALERT' ? 'Alerta' : 'Normal'}
                       </span>
                     </td>
                   </tr>
@@ -218,7 +219,7 @@ function MinEditor({ value, onSave }) {
       className="form-input"
       style={{ width: 80 }}
       value={val}
-      onChange={e => setVal(parseInt(e.target.value))}
+      onChange={e => setVal(parseInt(e.target.value) || 0)}
       onBlur={save}
       onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }}
       autoFocus
@@ -230,7 +231,6 @@ function MinEditor({ value, onSave }) {
       title="Clique para editar"
     >
       <strong>{value}</strong>
-      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>✎</span>
     </div>
   );
 }

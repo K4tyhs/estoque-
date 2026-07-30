@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import StatusBadge from '../components/StatusBadge';
+import { IconCheck, IconCross, IconAlert, IconEdit } from '../components/Icons';
 
 export default function Dashboard() {
   const { user, can } = useAuth();
@@ -9,6 +10,8 @@ export default function Dashboard() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confirmingId, setConfirmingId] = useState(null);
+  const [editingQtyId, setEditingQtyId] = useState(null);
+  const [customQuantities, setCustomQuantities] = useState({});
   const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -24,16 +27,40 @@ export default function Dashboard() {
       ]);
       setItems(itemsRes.data);
       setOrders(ordersRes.data);
+
+      const initialQtys = {};
+      ordersRes.data.forEach(o => {
+        initialQtys[o.id] = o.predicted_quantity;
+      });
+      setCustomQuantities(initialQtys);
     } catch {} finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
+  const handleQtyChange = (orderId, val) => {
+    const qty = parseInt(val) || 1;
+    setCustomQuantities(prev => ({ ...prev, [orderId]: qty }));
+  };
+
+  const saveQuantity = async (orderId) => {
+    const qty = customQuantities[orderId];
+    try {
+      await api.put(`/purchase-orders/${orderId}/quantity`, { quantity: qty });
+      showToast('Quantidade do pedido atualizada');
+      setEditingQtyId(null);
+      load();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Erro ao atualizar quantidade', 'error');
+    }
+  };
+
   const confirmOrder = async (orderId) => {
     setConfirmingId(orderId);
+    const qty = customQuantities[orderId];
     try {
-      const { data } = await api.put(`/purchase-orders/${orderId}/confirm`);
-      showToast(data.jiraTask ? `Pedido confirmado! Tarefa JIRA: ${data.jiraTask.id}` : 'Pedido confirmado com sucesso!');
+      const { data } = await api.put(`/purchase-orders/${orderId}/confirm`, { quantity: qty });
+      showToast(data.jiraTask ? `Pedido confirmado! Tarefa JIRA criada: ${data.jiraTask.id}` : 'Pedido confirmado com sucesso!');
       load();
     } catch (err) {
       showToast(err.response?.data?.error || 'Erro ao confirmar pedido', 'error');
@@ -59,7 +86,7 @@ export default function Dashboard() {
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999 }}>
           <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280, boxShadow: 'var(--shadow)' }}>
-            {toast.type === 'error' ? '⚠️' : '✅'} {toast.msg}
+            {toast.type === 'error' ? <IconAlert /> : <IconCheck />} {toast.msg}
           </div>
         </div>
       )}
@@ -92,8 +119,12 @@ export default function Dashboard() {
         <div className="card mb-24" style={{ borderColor: 'rgba(255,107,0,0.3)', background: 'linear-gradient(135deg, var(--bg-card), #150900)' }}>
           <div className="section-header">
             <div>
-              <div className="section-title">Pedidos de Compra Pendentes</div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>Confirme para criar tarefa no JIRA automaticamente</div>
+              <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <IconAlert color="var(--orange)" /> Pedidos de Compra Pendentes (A Serem Feitos)
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Você pode ajustar a quantidade a ser pedida antes de confirmar o disparo da ordem no JIRA
+              </div>
             </div>
             <span className="badge badge-pending">{orders.length} pendente{orders.length > 1 ? 's' : ''}</span>
           </div>
@@ -104,8 +135,8 @@ export default function Dashboard() {
                   <th>Item</th>
                   <th>Qtd Atual</th>
                   <th>Mínimo</th>
-                  <th>Qtd Sugerida</th>
-                  <th>Média/dia</th>
+                  <th>Qtd a Pedir</th>
+                  <th>Média/Dia</th>
                   <th>Cobertura</th>
                   <th>Ações</th>
                 </tr>
@@ -117,9 +148,25 @@ export default function Dashboard() {
                       <div style={{ fontWeight: 600 }}>{o.item_name}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{o.category}</div>
                     </td>
-                    <td><span style={{ color: o.current_quantity <= 0 ? 'var(--status-critical)' : 'var(--status-alert)', fontWeight: 700 }}>{o.current_quantity}</span></td>
+                    <td>
+                      <span style={{ color: o.current_quantity <= 0 ? 'var(--status-critical)' : 'var(--status-alert)', fontWeight: 700 }}>
+                        {o.current_quantity}
+                      </span>
+                    </td>
                     <td>{o.minimum_quantity}</td>
-                    <td><strong style={{ color: 'var(--orange)', fontSize: 16 }}>{o.predicted_quantity}</strong> {o.unit}</td>
+                    <td>
+                      <div className="flex items-center gap-8">
+                        <input
+                          type="number"
+                          min="1"
+                          className="form-input"
+                          style={{ width: 80, padding: '4px 8px', fontWeight: 700, color: 'var(--orange)', textAlign: 'center' }}
+                          value={customQuantities[o.id] ?? o.predicted_quantity}
+                          onChange={e => handleQtyChange(o.id, e.target.value)}
+                        />
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{o.unit}</span>
+                      </div>
+                    </td>
                     <td>{Number(o.daily_average || 0).toFixed(2)}/dia</td>
                     <td>{o.coverage_days} dias</td>
                     <td>
@@ -129,9 +176,11 @@ export default function Dashboard() {
                           onClick={() => confirmOrder(o.id)}
                           disabled={confirmingId === o.id}
                         >
-                          {confirmingId === o.id ? <div className="spinner" style={{width:14,height:14}}></div> : '✓'} Confirmar
+                          {confirmingId === o.id ? <div className="spinner" style={{width:14,height:14}}></div> : <IconCheck />} Confirmar
                         </button>
-                        <button className="btn btn-danger btn-sm" onClick={() => cancelOrder(o.id)}>Cancelar</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => cancelOrder(o.id)}>
+                          <IconCross /> Cancelar
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -183,7 +232,6 @@ export default function Dashboard() {
                     <td style={{ color: 'var(--text-secondary)' }}>{item.minimum_quantity}</td>
                     <td>
                       <StatusBadge status={item.status} />
-                      {item.status === 'CRITICAL' && <span className="pulse" style={{ marginLeft: 6, color: 'var(--status-critical)', fontSize: 10 }}>●</span>}
                     </td>
                     <td style={{ minWidth: 120 }}>
                       <div className="progress-bar">

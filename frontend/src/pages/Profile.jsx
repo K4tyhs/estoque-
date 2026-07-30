@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { IconAlert, IconCheck } from '../components/Icons';
 
 const ROLE_LABELS = { ADMIN: 'Administrador', TI: 'Equipe TI', PATRIMONIO: 'Patrimônio' };
 
@@ -25,13 +26,13 @@ export default function Profile() {
     setLoading(true);
     try {
       await api.put('/auth/change-password', { currentPassword: form.currentPassword, newPassword: form.newPassword });
-      showToast('Senha alterada! Faça login novamente.');
+      showToast('Senha alterada com sucesso! Faça login novamente.');
       setTimeout(async () => {
         await logout();
         navigate('/login');
       }, 2000);
     } catch (err) {
-      showToast(err.response?.data?.error || 'Erro', 'error');
+      showToast(err.response?.data?.error || 'Erro ao alterar senha', 'error');
     } finally { setLoading(false); }
   };
 
@@ -39,15 +40,15 @@ export default function Profile() {
     <div className="page-container fade-in">
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999 }}>
-          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280 }}>
-            {toast.type === 'error' ? '⚠️' : '✅'} {toast.msg}
+          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280, boxShadow: 'var(--shadow)' }}>
+            {toast.type === 'error' ? <IconAlert /> : <IconCheck />} {toast.msg}
           </div>
         </div>
       )}
 
       <div className="page-header">
-        <h1 className="page-title">👤 Meu Perfil</h1>
-        <p className="page-subtitle">Informações da sua conta</p>
+        <h1 className="page-title">Meu Perfil</h1>
+        <p className="page-subtitle">Informações da conta e segurança</p>
       </div>
 
       <div className="grid-2" style={{ maxWidth: 800 }}>
@@ -59,7 +60,7 @@ export default function Profile() {
               <div style={{ fontWeight: 600, fontSize: 16 }}>{user?.name}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>Email</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600, marginBottom: 4 }}>E-mail Corporativo</div>
               <div style={{ color: 'var(--text-secondary)' }}>{user?.email}</div>
             </div>
             <div>
@@ -70,7 +71,7 @@ export default function Profile() {
         </div>
 
         <div className="card">
-          <div className="section-title mb-16">🔐 Alterar Senha</div>
+          <div className="section-title mb-16">Alterar Senha</div>
           <form onSubmit={changePassword}>
             <div className="form-group">
               <label className="form-label">Senha Atual *</label>
@@ -85,11 +86,11 @@ export default function Profile() {
               <input type="password" className="form-input" required minLength={8} value={form.confirm} onChange={e => setForm({...form, confirm: e.target.value})} placeholder="Repita a nova senha" />
             </div>
             <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-              {loading ? <><div className="spinner" style={{width:16,height:16}}></div> Salvando...</> : 'Alterar Senha'}
+              {loading ? <><div className="spinner" style={{width:16,height:16}}></div> Salvando...</> : 'Salvar Nova Senha'}
             </button>
           </form>
           <div className="alert alert-warning mt-16">
-            ⚠️ Após alterar a senha, você será desconectado automaticamente.
+            <IconAlert /> Após alterar a senha, sua sessão será encerrada automaticamente por segurança.
           </div>
         </div>
       </div>

@@ -29,13 +29,15 @@ router.get('/webhooks/logs', authMiddleware, webhookCtrl.getWebhookLogs);
 router.get('/stock', authMiddleware, stockCtrl.getItems);
 router.get('/stock/movements', authMiddleware, stockCtrl.getMovements);
 router.get('/stock/:id', authMiddleware, stockCtrl.getItemById);
-router.post('/stock', authMiddleware, requireRole('ADMIN'), stockCtrl.createItem);
-router.put('/stock/:id', authMiddleware, requireRole('ADMIN'), stockCtrl.updateItem);
-router.delete('/stock/:id', authMiddleware, requireRole('ADMIN'), stockCtrl.deleteItem);
-router.post('/stock/:id/move', authMiddleware, requireRole('ADMIN'), stockCtrl.manualMove);
+router.post('/stock', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.createItem);
+router.put('/stock/:id', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.updateItem);
+router.delete('/stock/:id', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.deleteItem);
+router.post('/stock/:id/move', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.manualMove);
 
-// Purchase Orders
+// Purchase Orders - Permissão para Admin e TI criarem pedidos de compra manuais
 router.get('/purchase-orders', authMiddleware, poCtrl.getPurchaseOrders);
+router.post('/purchase-orders', authMiddleware, requireRole('ADMIN', 'TI'), poCtrl.createManualPurchaseOrder);
+router.put('/purchase-orders/:id/quantity', authMiddleware, requireRole('ADMIN', 'TI'), poCtrl.updateQuantity);
 router.put('/purchase-orders/:id/confirm', authMiddleware, requireRole('ADMIN', 'TI'), poCtrl.confirmPurchaseOrder);
 router.put('/purchase-orders/:id/cancel', authMiddleware, requireRole('ADMIN', 'TI'), poCtrl.cancelPurchaseOrder);
 router.get('/purchase-orders/recalculate/:item_id', authMiddleware, requireRole('ADMIN', 'TI'), poCtrl.recalculate);

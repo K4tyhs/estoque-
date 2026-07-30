@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Stock from './pages/Stock';
+import Orders from './pages/Orders';
 import Triggers from './pages/Triggers';
 import Reports from './pages/Reports';
 import Webhooks from './pages/Webhooks';
@@ -36,9 +37,10 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/estoque" element={<Stock />} />
+          <Route path="/pedidos" element={<Orders />} />
           <Route path="/triggers" element={<PrivateRoute roles={['ADMIN']}><Triggers /></PrivateRoute>} />
           <Route path="/relatorios" element={<PrivateRoute roles={['ADMIN', 'TI']}><Reports /></PrivateRoute>} />
-          <Route path="/webhooks" element={<Webhooks />} />
+          <Route path="/webhooks" element={<PrivateRoute roles={['ADMIN', 'TI']}><Webhooks /></PrivateRoute>} />
           <Route path="/usuarios" element={<PrivateRoute roles={['ADMIN']}><Users /></PrivateRoute>} />
           <Route path="/perfil" element={<Profile />} />
           <Route path="*" element={<Navigate to="/" replace />} />

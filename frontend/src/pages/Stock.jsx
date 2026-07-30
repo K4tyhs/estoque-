@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import StatusBadge from '../components/StatusBadge';
+import { IconPlus, IconEdit, IconTrash, IconArrowUpDown, IconSearch, IconCheck, IconCross, IconAlert } from '../components/Icons';
 
 export default function Stock() {
   const { can } = useAuth();
@@ -41,34 +42,34 @@ export default function Stock() {
       await api.post('/stock', form);
       showToast('Item criado com sucesso!');
       setModal(null); load();
-    } catch (err) { showToast(err.response?.data?.error || 'Erro', 'error'); }
+    } catch (err) { showToast(err.response?.data?.error || 'Erro ao criar item', 'error'); }
   };
 
   const handleEdit = async (e) => {
     e.preventDefault();
     try {
       await api.put(`/stock/${form.id}`, form);
-      showToast('Item atualizado!');
+      showToast('Item atualizado com sucesso!');
       setModal(null); load();
-    } catch (err) { showToast(err.response?.data?.error || 'Erro', 'error'); }
+    } catch (err) { showToast(err.response?.data?.error || 'Erro ao atualizar item', 'error'); }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Tem certeza que deseja remover este item?')) return;
     try {
       await api.delete(`/stock/${id}`);
-      showToast('Item removido');
+      showToast('Item removido com sucesso');
       load();
-    } catch {}
+    } catch (err) { showToast(err.response?.data?.error || 'Erro ao remover item', 'error'); }
   };
 
   const handleMove = async (e) => {
     e.preventDefault();
     try {
       await api.post(`/stock/${selectedItem.id}/move`, moveForm);
-      showToast('Movimentação registrada!');
+      showToast('Movimentação registrada com sucesso!');
       setModal(null); load();
-    } catch (err) { showToast(err.response?.data?.error || 'Erro', 'error'); }
+    } catch (err) { showToast(err.response?.data?.error || 'Erro ao registrar movimentação', 'error'); }
   };
 
   const filtered = items.filter(i =>
@@ -76,41 +77,50 @@ export default function Stock() {
     i.category.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (loading) return <div className="loading-center"><div className="spinner"></div></div>;
+  if (loading) return <div className="loading-center"><div className="spinner"></div><span>Carregando estoque...</span></div>;
 
   return (
     <div className="page-container fade-in">
       {toast && (
         <div style={{ position: 'fixed', top: 24, right: 24, zIndex: 9999 }}>
-          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280 }}>
-            {toast.type === 'error' ? '⚠️' : '✅'} {toast.msg}
+          <div className={`alert alert-${toast.type === 'error' ? 'error' : 'success'}`} style={{ minWidth: 280, boxShadow: 'var(--shadow)' }}>
+            {toast.type === 'error' ? <IconAlert /> : <IconCheck />} {toast.msg}
           </div>
         </div>
       )}
 
       <div className="page-header">
         <h1 className="page-title">Estoque</h1>
-        <p className="page-subtitle">Gerenciamento de itens e movimentações</p>
+        <p className="page-subtitle">Gerenciamento completo de itens e histórico de movimentações</p>
       </div>
 
       <div className="flex gap-8 mb-16">
-        <button className={`btn ${tab === 'items' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('items')}>📦 Itens</button>
-        <button className={`btn ${tab === 'history' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('history')}>📜 Histórico</button>
+        <button className={`btn ${tab === 'items' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('items')}>
+          Itens em Estoque
+        </button>
+        <button className={`btn ${tab === 'history' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('history')}>
+          Histórico de Movimentações
+        </button>
       </div>
 
       {tab === 'items' && (
         <>
           <div className="flex items-center justify-between mb-16" style={{ gap: 16 }}>
-            <input
-              className="form-input"
-              placeholder="Buscar por nome ou categoria..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ maxWidth: 360 }}
-            />
-            {can('ADMIN') && (
+            <div style={{ position: 'relative', width: 360 }}>
+              <input
+                className="form-input"
+                placeholder="Buscar por nome ou categoria..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{ paddingLeft: 36 }}
+              />
+              <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>
+                <IconSearch size={16} />
+              </div>
+            </div>
+            {can('ADMIN', 'TI') && (
               <button className="btn btn-primary" onClick={openCreate}>
-                + Adicionar Item
+                <IconPlus /> Novo Item
               </button>
             )}
           </div>
@@ -124,7 +134,7 @@ export default function Stock() {
                   <th>Mínimo</th>
                   <th>Unidade</th>
                   <th>Status</th>
-                  {can('ADMIN') && <th>Ações</th>}
+                  {can('ADMIN', 'TI') && <th>Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -136,19 +146,25 @@ export default function Stock() {
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{item.category}</td>
                     <td>
-                      <span style={{ fontSize: 20, fontWeight: 800, color: item.status === 'CRITICAL' ? 'var(--status-critical)' : item.status === 'ALERT' ? 'var(--orange)' : 'var(--status-normal)' }}>
+                      <span style={{ fontSize: 18, fontWeight: 800, color: item.status === 'CRITICAL' ? 'var(--status-critical)' : item.status === 'ALERT' ? 'var(--orange)' : 'var(--status-normal)' }}>
                         {item.current_quantity}
                       </span>
                     </td>
                     <td>{item.minimum_quantity}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{item.unit}</td>
                     <td><StatusBadge status={item.status} /></td>
-                    {can('ADMIN') && (
+                    {can('ADMIN', 'TI') && (
                       <td>
                         <div className="flex gap-8">
-                          <button className="btn btn-secondary btn-sm" onClick={() => openMove(item)}>⇅ Entrada/Saída</button>
-                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(item)}>✎ Editar</button>
-                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item.id)}>✕</button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openMove(item)} title="Registrar Entrada ou Saída">
+                            <IconArrowUpDown /> Movimentar
+                          </button>
+                          <button className="btn btn-secondary btn-sm" onClick={() => openEdit(item)} title="Editar Item">
+                            <IconEdit /> Editar
+                          </button>
+                          <button className="btn btn-danger btn-sm" onClick={() => handleDelete(item.id)} title="Excluir Item">
+                            <IconTrash />
+                          </button>
                         </div>
                       </td>
                     )}
@@ -165,32 +181,32 @@ export default function Stock() {
           <table className="table">
             <thead>
               <tr>
-                <th>Data</th>
+                <th>Data/Hora</th>
                 <th>Item</th>
                 <th>Tipo</th>
-                <th>Qtd</th>
-                <th>Fonte</th>
+                <th>Quantidade</th>
+                <th>Origem</th>
                 <th>Chamado</th>
                 <th>Solicitante</th>
-                <th>Obs</th>
+                <th>Observações</th>
               </tr>
             </thead>
             <tbody>
               {movements.map(m => (
                 <tr key={m.id}>
-                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                  <td style={{ whiteSpace: 'nowrap', color: 'var(--text-secondary)', fontSize: 12 }}>
                     {new Date(m.created_at).toLocaleString('pt-BR')}
                   </td>
                   <td style={{ fontWeight: 600 }}>{m.item_name}</td>
                   <td>
                     <span className={`badge ${m.type === 'IN' ? 'badge-confirmed' : 'badge-alert'}`}>
-                      {m.type === 'IN' ? '↑ Entrada' : '↓ Saída'}
+                      {m.type === 'IN' ? 'Entrada' : 'Saída'}
                     </span>
                   </td>
                   <td style={{ fontWeight: 700 }}>{m.quantity}</td>
                   <td>
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      {m.source === 'JIRA_WEBHOOK' ? '🔵 JIRA' : m.source === 'WHATSAPP_WEBHOOK' ? '🟢 WhatsApp' : m.source === 'MANUAL' ? '👤 Manual' : '🛒 Compra'}
+                    <span className="badge" style={{ background: 'var(--bg-input)', color: 'var(--text-secondary)' }}>
+                      {m.source === 'JIRA_WEBHOOK' ? 'JIRA' : m.source === 'WHATSAPP_WEBHOOK' ? 'WhatsApp' : m.source === 'MANUAL' ? 'Manual' : 'Compra'}
                     </span>
                   </td>
                   <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{m.ticket_id || '-'}</td>
@@ -207,13 +223,13 @@ export default function Stock() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Novo Item de Estoque</h2>
-              <button className="modal-close" onClick={() => setModal(null)}>×</button>
+              <h2 className="modal-title">Adicionar Novo Item</h2>
+              <button className="modal-close" onClick={() => setModal(null)}><IconCross /></button>
             </div>
             <form onSubmit={handleCreate}>
               <div className="grid-2">
                 <div className="form-group">
-                  <label className="form-label">Nome *</label>
+                  <label className="form-label">Nome do Item *</label>
                   <input className="form-input" required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Ex: Headset USB" />
                 </div>
                 <div className="form-group">
@@ -223,7 +239,7 @@ export default function Stock() {
               </div>
               <div className="form-group">
                 <label className="form-label">Descrição</label>
-                <input className="form-input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+                <input className="form-input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Especificações do item" />
               </div>
               <div className="grid-3">
                 <div className="form-group">
@@ -232,16 +248,16 @@ export default function Stock() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Qtd. Inicial</label>
-                  <input className="form-input" type="number" min="0" value={form.current_quantity} onChange={e => setForm({...form, current_quantity: parseInt(e.target.value)})} />
+                  <input className="form-input" type="number" min="0" value={form.current_quantity} onChange={e => setForm({...form, current_quantity: parseInt(e.target.value) || 0})} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Qtd. Mínima</label>
-                  <input className="form-input" type="number" min="1" value={form.minimum_quantity} onChange={e => setForm({...form, minimum_quantity: parseInt(e.target.value)})} />
+                  <input className="form-input" type="number" min="1" value={form.minimum_quantity} onChange={e => setForm({...form, minimum_quantity: parseInt(e.target.value) || 1})} />
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Criar Item</button>
+                <button type="submit" className="btn btn-primary">Salvar Item</button>
               </div>
             </form>
           </div>
@@ -252,8 +268,8 @@ export default function Stock() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h2 className="modal-title">Editar: {form.name}</h2>
-              <button className="modal-close" onClick={() => setModal(null)}>×</button>
+              <h2 className="modal-title">Editar Item: {form.name}</h2>
+              <button className="modal-close" onClick={() => setModal(null)}><IconCross /></button>
             </div>
             <form onSubmit={handleEdit}>
               <div className="grid-2">
@@ -277,12 +293,12 @@ export default function Stock() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Qtd. Mínima</label>
-                  <input className="form-input" type="number" min="1" value={form.minimum_quantity} onChange={e => setForm({...form, minimum_quantity: parseInt(e.target.value)})} />
+                  <input className="form-input" type="number" min="1" value={form.minimum_quantity} onChange={e => setForm({...form, minimum_quantity: parseInt(e.target.value) || 1})} />
                 </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancelar</button>
-                <button type="submit" className="btn btn-primary">Salvar</button>
+                <button type="submit" className="btn btn-primary">Salvar Alterações</button>
               </div>
             </form>
           </div>
@@ -294,7 +310,7 @@ export default function Stock() {
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Movimentação: {selectedItem.name}</h2>
-              <button className="modal-close" onClick={() => setModal(null)}>×</button>
+              <button className="modal-close" onClick={() => setModal(null)}><IconCross /></button>
             </div>
             <div className="alert alert-info" style={{ marginBottom: 16 }}>
               Estoque atual: <strong>{selectedItem.current_quantity} {selectedItem.unit}</strong>
@@ -303,21 +319,27 @@ export default function Stock() {
               <div className="form-group">
                 <label className="form-label">Tipo de Movimentação</label>
                 <div className="flex gap-8">
-                  <button type="button" className={`btn ${moveForm.type === 'OUT' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setMoveForm({...moveForm, type: 'OUT'})}>↓ Saída</button>
-                  <button type="button" className={`btn ${moveForm.type === 'IN' ? 'btn-success' : 'btn-secondary'}`} onClick={() => setMoveForm({...moveForm, type: 'IN'})}>↑ Entrada</button>
+                  <button type="button" className={`btn ${moveForm.type === 'OUT' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setMoveForm({...moveForm, type: 'OUT'})}>
+                    Saída de Estoque
+                  </button>
+                  <button type="button" className={`btn ${moveForm.type === 'IN' ? 'btn-success' : 'btn-secondary'}`} onClick={() => setMoveForm({...moveForm, type: 'IN'})}>
+                    Entrada de Estoque
+                  </button>
                 </div>
               </div>
               <div className="form-group">
                 <label className="form-label">Quantidade</label>
-                <input className="form-input" type="number" min="1" value={moveForm.quantity} onChange={e => setMoveForm({...moveForm, quantity: parseInt(e.target.value)})} />
+                <input className="form-input" type="number" min="1" value={moveForm.quantity} onChange={e => setMoveForm({...moveForm, quantity: parseInt(e.target.value) || 1})} />
               </div>
               <div className="form-group">
-                <label className="form-label">Observações</label>
-                <input className="form-input" value={moveForm.notes} onChange={e => setMoveForm({...moveForm, notes: e.target.value})} placeholder="Motivo da movimentação..." />
+                <label className="form-label">Observações / Solicitante</label>
+                <input className="form-input" value={moveForm.notes} onChange={e => setMoveForm({...moveForm, notes: e.target.value})} placeholder="Motivo ou número do chamado..." />
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setModal(null)}>Cancelar</button>
-                <button type="submit" className={`btn ${moveForm.type === 'IN' ? 'btn-success' : 'btn-danger'}`}>Confirmar Movimentação</button>
+                <button type="submit" className={`btn ${moveForm.type === 'IN' ? 'btn-success' : 'btn-danger'}`}>
+                  Confirmar {moveForm.type === 'IN' ? 'Entrada' : 'Saída'}
+                </button>
               </div>
             </form>
           </div>

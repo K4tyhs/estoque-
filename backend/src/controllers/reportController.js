@@ -1,69 +1,120 @@
 const db = require('../database/db');
 
+const MONTH_NAMES_SHORT = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+const MONTH_NAMES_FULL = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 function getMonthlyReport(req, res) {
-  const year = parseInt(req.query.year) || new Date().getFullYear();
-  const month = parseInt(req.query.month) || new Date().getMonth() + 1;
-  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+  try {
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+    let months = [];
 
-  const movements = db.prepare(`
-    SELECT m.item_id, s.name as item_name, s.category, s.unit,
-      SUM(CASE WHEN m.type = 'IN' THEN m.quantity ELSE 0 END) as total_in,
-      SUM(CASE WHEN m.type = 'OUT' THEN m.quantity ELSE 0 END) as total_out,
-      COUNT(*) as total_movements
-    FROM stock_movements m
-    JOIN stock_items s ON m.item_id = s.id
-    WHERE strftime('%Y-%m', m.created_at) = ?
-    GROUP BY m.item_id
-    ORDER BY total_out DESC
-  `).all(monthStr);
+    if (req.query.months) {
+      months = req.query.months.toString().split(',').map(m => parseInt(m.trim())).filter(m => m >= 1 && m <= 12);
+    } else if (req.query.month) {
+      months = [parseInt(req.query.month)];
+    }
 
-  // Previous month comparison
-  const prevYear = month === 1 ? year - 1 : year;
-  const prevMonth = month === 1 ? 12 : month - 1;
-  const prevMonthStr = `${prevYear}-${String(prevMonth).padStart(2, '0')}`;
+    if (months.length === 0) {
+      months = [new Date().getMonth() + 1];
+    }
 
-  const prevMovements = db.prepare(`
-    SELECT m.item_id,
-      SUM(CASE WHEN m.type = 'OUT' THEN m.quantity ELSE 0 END) as total_out
-    FROM stock_movements m
-    WHERE strftime('%Y-%m', m.created_at) = ?
-    GROUP BY m.item_id
-  `).all(prevMonthStr);
+    months.sort((a, b) => a - b);
 
-  const prevMap = {};
-  prevMovements.forEach(p => { prevMap[p.item_id] = p.total_out; });
+    const selectedMonths = months.map(m => ({
+      month: m,
+      nameShort: MONTH_NAMES_SHORT[m],
+      nameFull: MONTH_NAMES_FULL[m],
+      key: `month_${m}`,
+      yearMonthStr: `${year}-${String(m).padStart(2, '0')}`,
+    }));
 
-  const report = movements.map(m => {
-    const prevOut = prevMap[m.item_id] || 0;
-    const diff = m.total_out - prevOut;
-    const pct = prevOut > 0 ? ((diff / prevOut) * 100).toFixed(1) : null;
-    return {
-      ...m,
-      prev_total_out: prevOut,
-      diff_out: diff,
-      pct_change: pct,
-      trend: diff > 0 ? 'UP' : diff < 0 ? 'DOWN' : 'STABLE',
-    };
-  });
+    // Fetch all items active or moved
+    const allItems = db.prepare('SELECT id, name, category, unit FROM stock_items ORDER BY category, name').all();
 
-  const totalIn = movements.reduce((s, m) => s + m.total_in, 0);
-  const totalOut = movements.reduce((s, m) => s + m.total_out, 0);
+    // Query movements for selected months
+    const monthPlaceholders = selectedMonths.map(sm => `'${sm.yearMonthStr}'`).join(',');
 
-  const dailyTrend = db.prepare(`
-    SELECT strftime('%d', created_at) as day,
-      SUM(CASE WHEN type = 'OUT' THEN quantity ELSE 0 END) as out_qty
-    FROM stock_movements
-    WHERE strftime('%Y-%m', created_at) = ?
-    GROUP BY strftime('%d', created_at)
-    ORDER BY day ASC
-  `).all(monthStr);
+    const movementsQuery = `
+      SELECT
+        m.item_id,
+        s.name as item_name,
+        s.category,
+        m.type,
+        m.quantity,
+        strftime('%Y-%m', m.created_at) as year_month,
+        CAST(strftime('%m', m.created_at) AS INTEGER) as month_num
+      FROM stock_movements m
+      JOIN stock_items s ON m.item_id = s.id
+      WHERE strftime('%Y', m.created_at) = ?
+        AND CAST(strftime('%m', m.created_at) AS INTEGER) IN (${months.join(',')})
+    `;
 
-  return res.json({
-    year, month, monthStr,
-    summary: { totalIn, totalOut, totalMovements: movements.reduce((s, m) => s + m.total_movements, 0) },
-    items: report,
-    dailyTrend,
-  });
+    const movements = db.prepare(movementsQuery).all(String(year));
+
+    // Aggregate by item and month
+    const itemsMap = {};
+    allItems.forEach(item => {
+      itemsMap[item.id] = {
+        item_id: item.id,
+        item_name: item.name,
+        category: item.category,
+        unit: item.unit,
+        total_out_all: 0,
+        total_in_all: 0,
+      };
+      selectedMonths.forEach(sm => {
+        itemsMap[item.id][`out_${sm.month}`] = 0;
+        itemsMap[item.id][`in_${sm.month}`] = 0;
+      });
+    });
+
+    let totalOutOverall = 0;
+    let totalInOverall = 0;
+    let totalMovementsCount = movements.length;
+
+    movements.forEach(m => {
+      if (!itemsMap[m.item_id]) {
+        itemsMap[m.item_id] = {
+          item_id: m.item_id,
+          item_name: m.item_name,
+          category: m.category,
+          unit: '',
+          total_out_all: 0,
+          total_in_all: 0,
+        };
+        selectedMonths.forEach(sm => {
+          itemsMap[m.item_id][`out_${sm.month}`] = 0;
+          itemsMap[m.item_id][`in_${sm.month}`] = 0;
+        });
+      }
+
+      if (m.type === 'OUT') {
+        itemsMap[m.item_id][`out_${m.month_num}`] = (itemsMap[m.item_id][`out_${m.month_num}`] || 0) + m.quantity;
+        itemsMap[m.item_id].total_out_all += m.quantity;
+        totalOutOverall += m.quantity;
+      } else if (m.type === 'IN') {
+        itemsMap[m.item_id][`in_${m.month_num}`] = (itemsMap[m.item_id][`in_${m.month_num}`] || 0) + m.quantity;
+        itemsMap[m.item_id].total_in_all += m.quantity;
+        totalInOverall += m.quantity;
+      }
+    });
+
+    const reportItems = Object.values(itemsMap).filter(item => item.total_out_all > 0 || item.total_in_all > 0);
+
+    return res.json({
+      year,
+      selectedMonths,
+      summary: {
+        totalOut: totalOutOverall,
+        totalIn: totalInOverall,
+        totalMovements: totalMovementsCount,
+      },
+      items: reportItems,
+    });
+  } catch (err) {
+    console.error('[REPORT] Erro ao gerar relatório:', err);
+    return res.status(500).json({ error: 'Erro interno ao gerar relatório' });
+  }
 }
 
 function getAvailableMonths(req, res) {
@@ -71,7 +122,6 @@ function getAvailableMonths(req, res) {
     SELECT DISTINCT strftime('%Y', created_at) as year, strftime('%m', created_at) as month
     FROM stock_movements
     ORDER BY year DESC, month DESC
-    LIMIT 12
   `).all();
   return res.json(months);
 }

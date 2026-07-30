@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import FarmarcasLogo from './FarmarcasLogo';
+import {
+  IconDashboard,
+  IconStock,
+  IconOrders,
+  IconWebhooks,
+  IconReports,
+  IconTriggers,
+  IconUsers,
+  IconProfile,
+  IconLogout,
+} from './Icons';
 import api from '../services/api';
 
 const ROLE_LABELS = { ADMIN: 'Administrador', TI: 'Equipe TI', PATRIMONIO: 'Patrimônio' };
@@ -36,43 +48,47 @@ export default function Sidebar() {
     <div className="sidebar">
       <div className="sidebar-logo">
         <div className="flex items-center gap-12">
-          <div style={{ width: 36, height: 36, background: 'linear-gradient(135deg, #FF6B00, #ff4500)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>
-            📦
-          </div>
+          <FarmarcasLogo width={38} height={38} />
           <div>
-            <div className="sidebar-logo-text">MVP Estoque</div>
-            <div className="sidebar-logo-sub">TI Farmarcas</div>
+            <div className="sidebar-logo-text">MVP ESTOQUE</div>
+            <div className="sidebar-logo-sub">TI FARMARCAS</div>
           </div>
         </div>
       </div>
 
       <nav className="sidebar-nav">
-        <div className="nav-section-label">Principal</div>
+        <div className="nav-section-label">Navegação</div>
 
         <NavLink to="/" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          <span className="nav-icon">📊</span>
+          <span className="nav-icon"><IconDashboard /></span>
           Dashboard
           {criticalItems > 0 && <span className="badge-count">{criticalItems}</span>}
         </NavLink>
 
         <NavLink to="/estoque" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          <span className="nav-icon">📦</span>
+          <span className="nav-icon"><IconStock /></span>
           Estoque
+        </NavLink>
+
+        <NavLink to="/pedidos" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+          <span className="nav-icon"><IconOrders /></span>
+          Pedidos de Compra
+          {pendingOrders > 0 && <span className="badge-count" style={{ background: 'var(--orange)' }}>{pendingOrders}</span>}
         </NavLink>
 
         {can('ADMIN', 'TI') && (
           <NavLink to="/webhooks" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-            <span className="nav-icon">🔗</span>
+            <span className="nav-icon"><IconWebhooks /></span>
             Webhooks
           </NavLink>
         )}
 
         {can('ADMIN', 'TI') && (
           <>
-            <div className="nav-section-label" style={{ marginTop: 16 }}>Relatórios</div>
+            <div className="nav-section-label" style={{ marginTop: 16 }}>Análise</div>
             <NavLink to="/relatorios" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-              <span className="nav-icon">📈</span>
-              Relatórios
+              <span className="nav-icon"><IconReports /></span>
+              Relatórios Mensais
             </NavLink>
           </>
         )}
@@ -81,11 +97,11 @@ export default function Sidebar() {
           <>
             <div className="nav-section-label" style={{ marginTop: 16 }}>Administração</div>
             <NavLink to="/triggers" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-              <span className="nav-icon">⚡</span>
+              <span className="nav-icon"><IconTriggers /></span>
               Triggers
             </NavLink>
             <NavLink to="/usuarios" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-              <span className="nav-icon">👥</span>
+              <span className="nav-icon"><IconUsers /></span>
               Usuários
             </NavLink>
           </>
@@ -93,11 +109,11 @@ export default function Sidebar() {
 
         <div className="nav-section-label" style={{ marginTop: 16 }}>Conta</div>
         <NavLink to="/perfil" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          <span className="nav-icon">👤</span>
-          Perfil
+          <span className="nav-icon"><IconProfile /></span>
+          Meu Perfil
         </NavLink>
         <button className="nav-item" onClick={handleLogout}>
-          <span className="nav-icon">🚪</span>
+          <span className="nav-icon"><IconLogout /></span>
           Sair
         </button>
       </nav>
