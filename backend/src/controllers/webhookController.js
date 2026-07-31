@@ -108,8 +108,16 @@ async function whatsappWebhook(req, res) {
 
 async function simulateWebhook(req, res) {
   const { source = 'MANUAL_SIM' } = req.body;
-  req.headers['x-webhook-secret'] = process.env.WEBHOOK_SECRET;
-  return processWebhook({ ...req, body: { ...req.body, source: undefined } }, res, source === 'WHATSAPP' ? 'WHATSAPP' : 'JIRA');
+  // Build a synthetic req with headers so processWebhook can validate the secret
+  const fakeReq = {
+    headers: {
+      ...(req.headers || {}),
+      'x-webhook-secret': process.env.WEBHOOK_SECRET || '',
+    },
+    body: { ...req.body, source: undefined },
+    user: req.user,
+  };
+  return processWebhook(fakeReq, res, source === 'WHATSAPP' ? 'WHATSAPP' : 'JIRA');
 }
 
 function getWebhookLogs(req, res) {

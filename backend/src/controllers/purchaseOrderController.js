@@ -1,5 +1,5 @@
 const db = require('../database/db');
-const { createJiraTask } = require('../services/jiraService');
+const { createBitrix24Task } = require('../services/bitrix24Service');
 const { calculatePredictiveQuantity } = require('../services/predictiveService');
 
 function getPurchaseOrders(req, res) {
@@ -17,7 +17,7 @@ function getPurchaseOrders(req, res) {
     query += ' AND po.status = ?';
     params.push(status);
   }
-  query += ' ORDER BY CASE po.status WHEN "PENDING" THEN 1 WHEN "CONFIRMED" THEN 2 ELSE 3 END, po.created_at DESC';
+  query += " ORDER BY CASE po.status WHEN 'PENDING' THEN 1 WHEN 'CONFIRMED' THEN 2 ELSE 3 END, po.created_at DESC";
   return res.json(db.prepare(query).all(...params));
 }
 
@@ -34,20 +34,19 @@ async function createManualPurchaseOrder(req, res) {
       return res.status(404).json({ error: 'Item não encontrado' });
     }
 
-    // Insert purchase order
     const result = db.prepare(`
       INSERT INTO purchase_orders (item_id, predicted_quantity, daily_average, days_since_last_order, coverage_days, status, trigger_quantity, notes)
       VALUES (?, ?, 0, 0, 45, 'PENDING', ?, ?)
-    `).run(item.id, parseInt(quantity), item.current_quantity, notes || 'Criado manualmente por ' + req.user.name);
+    `).run(item.id, parseInt(quantity), item.current_quantity, notes || `Criado manualmente por ${req.user.name}`);
 
     const orderId = result.lastInsertRowid;
 
     if (confirm_immediately) {
       const config = db.prepare('SELECT jira_integration_active FROM automation_config WHERE id = 1').get();
-      let jiraResult = { success: false };
+      let bitrix24Result = { success: false };
 
       if (config && config.jira_integration_active) {
-        jiraResult = await createJiraTask({
+        bitrix24Result = await createBitrix24Task({
           itemName: item.name,
           quantity: parseInt(quantity),
           predictiveDetails: { dailyAverage: 0, daysSinceLastOrder: 0, coverageDays: 45 },
@@ -63,12 +62,12 @@ async function createManualPurchaseOrder(req, res) {
             jira_task_id = ?,
             jira_task_url = ?
         WHERE id = ?
-      `).run(req.user.id, jiraResult.taskId || null, jiraResult.taskUrl || null, orderId);
+      `).run(req.user.id, bitrix24Result.taskId || null, bitrix24Result.taskUrl || null, orderId);
 
       return res.status(201).json({
         id: orderId,
         message: 'Pedido manual criado e confirmado com sucesso!',
-        jiraTask: jiraResult.success ? { id: jiraResult.taskId, url: jiraResult.taskUrl } : null,
+        bitrix24Task: bitrix24Result.success ? { id: bitrix24Result.taskId, url: bitrix24Result.taskUrl } : null,
       });
     }
 
@@ -124,10 +123,10 @@ async function confirmPurchaseOrder(req, res) {
     const finalQuantity = (quantity && quantity > 0) ? parseInt(quantity) : order.predicted_quantity;
 
     const config = db.prepare('SELECT jira_integration_active FROM automation_config WHERE id = 1').get();
-    let jiraResult = { success: false };
+    let bitrix24Result = { success: false };
 
     if (config && config.jira_integration_active) {
-      jiraResult = await createJiraTask({
+      bitrix24Result = await createBitrix24Task({
         itemName: order.item_name,
         quantity: finalQuantity,
         predictiveDetails: {
@@ -151,14 +150,14 @@ async function confirmPurchaseOrder(req, res) {
     `).run(
       finalQuantity,
       req.user.id,
-      jiraResult.taskId || null,
-      jiraResult.taskUrl || null,
+      bitrix24Result.taskId || null,
+      bitrix24Result.taskUrl || null,
       id
     );
 
     return res.json({
       message: 'Pedido de compra confirmado com sucesso',
-      jiraTask: jiraResult.success ? { id: jiraResult.taskId, url: jiraResult.taskUrl } : null,
+      bitrix24Task: bitrix24Result.success ? { id: bitrix24Result.taskId, url: bitrix24Result.taskUrl } : null,
       quantity: finalQuantity,
     });
   } catch (err) {
