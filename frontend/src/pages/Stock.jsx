@@ -57,6 +57,7 @@ export default function Stock() {
     try {
       const payload = {
         ...form,
+        current_quantity: parseInt(form.current_quantity) || 0,
         minimum_quantity: parseInt(form.minimum_quantity) || 1,
       };
       await api.put(`/stock/${form.id}`, payload);
@@ -259,6 +260,7 @@ export default function Stock() {
                                 name: item.name,
                                 category: item.category,
                                 unit: item.unit,
+                                current_quantity: item.current_quantity,
                                 minimum_quantity: item.minimum_quantity,
                                 notes: item.notes || ''
                               });
@@ -423,6 +425,10 @@ export default function Stock() {
                 <div className="form-group">
                   <label className="form-label">Unidade</label>
                   <input className="form-input" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Qtd. Atual *</label>
+                  <input className="form-input" type="number" min="0" required value={form.current_quantity} onChange={e => setForm({...form, current_quantity: e.target.value})} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Qtd. Mínima *</label>

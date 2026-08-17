@@ -19,6 +19,30 @@ async function login(req, res) {
             return res.status(401).json({ error: 'Credenciais inválidas' });
         }
 
+        // Verificar se a senha expirou (90 dias)
+        const passwordChangedAt = user.password_changed_at || user.created_at;
+        const passwordDate = new Date(passwordChangedAt);
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+        if (passwordDate < ninetyDaysAgo) {
+            const crypto = require('crypto');
+            const resetToken = crypto.randomBytes(32).toString('hex');
+            const expiresAt = new Date(Date.now() + 3600000).toISOString(); // 1 hora
+
+            db.prepare('UPDATE users SET reset_token = ?, reset_token_expires_at = ? WHERE id = ?')
+              .run(resetToken, expiresAt, user.id);
+
+            const emailService = require('../services/emailService');
+            await emailService.sendPasswordResetEmail(user.email, resetToken, user.name);
+
+            return res.status(403).json({
+                error: 'Sua senha expirou por ter mais de 90 dias. Um e-mail de alteração de senha foi enviado para você.',
+                expired: true,
+                email: user.email
+            });
+        }
+
         const { accessToken, refreshToken } = generateTokens(user);
         await storeRefreshToken(user.id, refreshToken);
 
@@ -82,7 +106,15 @@ async function changePassword(req, res) {
         }
 
         const newHash = await bcrypt.hash(newPassword, 12);
-        db.prepare(`UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(newHash, req.user.id);
+        db.prepare(`
+            UPDATE users 
+            SET password_hash = ?, 
+                password_changed_at = datetime('now'), 
+                reset_token = NULL, 
+                reset_token_expires_at = NULL, 
+                updated_at = datetime('now') 
+            WHERE id = ?
+        `).run(newHash, req.user.id);
         revokeUserTokens(req.user.id);
 
         return res.json({ message: 'Senha alterada com sucesso. Faça login novamente.' });
@@ -104,7 +136,15 @@ async function adminResetPassword(req, res) {
         if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
 
         const hash = await bcrypt.hash(newPassword, 12);
-        db.prepare(`UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`).run(hash, userId);
+        db.prepare(`
+            UPDATE users 
+            SET password_hash = ?, 
+                password_changed_at = datetime('now'), 
+                reset_token = NULL, 
+                reset_token_expires_at = NULL, 
+                updated_at = datetime('now') 
+            WHERE id = ?
+        `).run(hash, userId);
         revokeUserTokens(userId);
         return res.json({ message: 'Senha redefinida com sucesso' });
     } catch (err) {
@@ -173,8 +213,8 @@ async function firstAccess(req, res) {
 
         const hash = await bcrypt.hash(password, 10);
         db.prepare(`
-            INSERT INTO users (email, password_hash, name, role, is_active)
-            VALUES (?, ?, ?, ?, 1)
+            INSERT INTO users (email, password_hash, name, role, is_active, password_changed_at)
+            VALUES (?, ?, ?, ?, 1, datetime('now'))
         `).run(cleanEmail, hash, name, role);
 
         return res.status(201).json({ message: 'Primeiro acesso realizado e senha cadastrada com sucesso! Faça login.' });
@@ -183,4 +223,44 @@ async function firstAccess(req, res) {
     }
 }
 
-module.exports = { login, refresh, logout, changePassword, adminResetPassword, getMe, requestAccess, firstAccess };
+async function resetExpiredPassword(req, res) {
+    try {
+        const { token, newPassword } = req.body;
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token e nova senha são obrigatórios' });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'Nova senha deve ter pelo menos 8 caracteres' });
+        }
+
+        const user = db.prepare('SELECT * FROM users WHERE reset_token = ?').get(token);
+        if (!user) {
+            return res.status(400).json({ error: 'Token de alteração inválido' });
+        }
+
+        const expiresAt = new Date(user.reset_token_expires_at);
+        if (expiresAt < new Date()) {
+            return res.status(400).json({ error: 'Token de alteração expirado' });
+        }
+
+        const newHash = await bcrypt.hash(newPassword, 12);
+        db.prepare(`
+            UPDATE users 
+            SET password_hash = ?, 
+                password_changed_at = datetime('now'), 
+                reset_token = NULL, 
+                reset_token_expires_at = NULL, 
+                updated_at = datetime('now') 
+            WHERE id = ?
+        `).run(newHash, user.id);
+
+        revokeUserTokens(user.id);
+
+        return res.json({ message: 'Senha alterada com sucesso! Agora você pode fazer login.' });
+    } catch (err) {
+        console.error('[AUTH] Reset expired password error:', err);
+        return res.status(500).json({ error: 'Erro interno ao alterar senha' });
+    }
+}
+
+module.exports = { login, refresh, logout, changePassword, adminResetPassword, getMe, requestAccess, firstAccess, resetExpiredPassword };

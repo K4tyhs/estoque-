@@ -1,6 +1,5 @@
 const db = require('../database/db');
-const { calculatePredictiveQuantity } = require('../services/predictiveService');
-const { sendLowStockAlert } = require('../services/emailService');
+const { checkAndTriggerAlert } = require('../services/alertService');
 
 async function processWebhook(req, res, source) {
   const webhookSecret = process.env.WEBHOOK_SECRET;
@@ -45,37 +44,13 @@ async function processWebhook(req, res, source) {
     VALUES (?, 'OUT', ?, ?, ?, ?, ?)
   `).run(item.id, quantity, source === 'JIRA' ? 'JIRA_WEBHOOK' : source === 'WHATSAPP' ? 'WHATSAPP_WEBHOOK' : 'MANUAL', ticket_id || null, requester || null, `Baixa automática via ${source}`);
 
-  let alertSent = false;
-  let purchaseOrderId = null;
-  const config = db.prepare('SELECT * FROM automation_config WHERE id = 1').get();
+  const alertRes = await checkAndTriggerAlert(item.id, newQty, true).catch(err => {
+    console.error('Erro ao processar alerta de estoque baixo no webhook:', err);
+    return null;
+  });
 
-  if (newQty <= item.minimum_quantity && config && config.email_alerts_active) {
-    const prediction = calculatePredictiveQuantity(item.id, newQty, item.minimum_quantity);
-    const pendingOrder = db.prepare(`
-      SELECT id FROM purchase_orders WHERE item_id = ? AND status = 'PENDING'
-    `).get(item.id);
-
-    if (!pendingOrder) {
-      const poResult = db.prepare(`
-        INSERT INTO purchase_orders (item_id, predicted_quantity, daily_average, days_since_last_order, coverage_days, trigger_quantity, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
-      `).run(item.id, prediction.quantityToOrder, prediction.dailyAverage, prediction.daysSinceLastOrder, prediction.coverageDays, newQty);
-      purchaseOrderId = poResult.lastInsertRowid;
-
-      await sendLowStockAlert({
-        itemName: item.name,
-        currentQuantity: newQty,
-        minimumQuantity: item.minimum_quantity,
-        predictedQuantity: prediction.quantityToOrder,
-        dailyAverage: prediction.dailyAverage,
-        daysSinceLastOrder: prediction.daysSinceLastOrder,
-        coverageDays: prediction.coverageDays,
-      });
-
-      db.prepare(`UPDATE purchase_orders SET email_sent_at = datetime('now') WHERE id = ?`).run(purchaseOrderId);
-      alertSent = true;
-    }
-  }
+  const alertSent = alertRes ? alertRes.emailSent : false;
+  const purchaseOrderId = alertRes ? alertRes.purchaseOrderId : null;
 
   db.prepare(`
     INSERT INTO webhook_logs (source, payload, status, message, item_id, quantity_moved, ticket_id, requester)

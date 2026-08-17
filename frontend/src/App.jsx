@@ -12,6 +12,8 @@ import Webhooks from './pages/Webhooks';
 import Users from './pages/Users';
 import Profile from './pages/Profile';
 
+import ResetPassword from './pages/ResetPassword';
+
 function PrivateRoute({ children, roles }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="loading-center"><div className="spinner"></div><span>Carregando...</span></div>;
@@ -55,6 +57,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
         <Route path="/*" element={<PrivateRoute><AppLayout /></PrivateRoute>} />
       </Routes>
     </AuthProvider>

@@ -9,6 +9,9 @@ function initializeSchema() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL CHECK(role IN ('ADMIN', 'TI', 'PATRIMONIO')),
       is_active INTEGER NOT NULL DEFAULT 1,
+      password_changed_at TEXT NOT NULL DEFAULT (datetime('now')),
+      reset_token TEXT,
+      reset_token_expires_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -116,6 +119,17 @@ function initializeSchema() {
       VALUES (1, 0, 45, 0, 0)
     `).run();
     }
+
+    // Atualiza base de dados existente para incluir novas colunas de expiração de senha
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN password_changed_at TEXT NOT NULL DEFAULT (datetime('now'))");
+    } catch (e) {}
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN reset_token TEXT");
+    } catch (e) {}
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN reset_token_expires_at TEXT");
+    } catch (e) {}
 
     console.log('✅ Schema inicializado');
 }

@@ -44,7 +44,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Backend MVP Estoque rodando em http://localhost:${PORT}`);
+  console.log(`\n🚀 Backend Estoque rodando em http://localhost:${PORT}`);
   console.log(`📋 Health check: http://localhost:${PORT}/health`);
   console.log(`🔐 API Base: http://localhost:${PORT}/api\n`);
 });

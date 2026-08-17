@@ -20,6 +20,7 @@ router.put('/auth/change-password', authMiddleware, authCtrl.changePassword);
 router.put('/auth/admin-reset-password', authMiddleware, requireRole('ADMIN'), authCtrl.adminResetPassword);
 router.post('/auth/request-access', authCtrl.requestAccess);
 router.post('/auth/first-access', authCtrl.firstAccess);
+router.post('/auth/reset-expired-password', authCtrl.resetExpiredPassword);
 
 // Webhooks
 router.post('/webhooks/jira', webhookCtrl.jiraWebhook);
@@ -32,6 +33,7 @@ router.get('/stock', authMiddleware, stockCtrl.getItems);
 router.get('/stock/movements', authMiddleware, stockCtrl.getMovements);
 router.get('/stock/:id', authMiddleware, stockCtrl.getItemById);
 router.post('/stock', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.createItem);
+router.post('/stock/trigger-alerts', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.triggerAllAlerts);
 router.put('/stock/:id', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.updateItem);
 router.delete('/stock/:id', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.deleteItem);
 router.post('/stock/:id/move', authMiddleware, requireRole('ADMIN', 'TI'), stockCtrl.manualMove);

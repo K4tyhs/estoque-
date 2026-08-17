@@ -50,7 +50,7 @@ export default function Sidebar() {
         <div className="flex items-center gap-12">
           <FarmarcasLogo width={38} height={38} />
           <div>
-            <div className="sidebar-logo-text">MVP ESTOQUE</div>
+            <div className="sidebar-logo-text">ESTOQUE</div>
             <div className="sidebar-logo-sub">TI FARMARCAS</div>
           </div>
         </div>

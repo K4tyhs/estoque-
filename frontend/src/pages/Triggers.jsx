@@ -10,6 +10,22 @@ export default function Triggers() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
+  const [triggering, setTriggering] = useState(false);
+
+  const triggerTestAlerts = async () => {
+    setTriggering(true);
+    try {
+      const { data } = await api.post('/stock/trigger-alerts');
+      const resultsText = data.results 
+        ? data.results.map(r => `${r.itemName} (${r.emailSent ? 'Enviado' : 'Falhou: ' + r.reason})`).join(', ')
+        : '';
+      showToast(`Alertas disparados! ${resultsText}`);
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Erro ao disparar alertas por e-mail', 'error');
+    } finally {
+      setTriggering(false);
+    }
+  };
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
@@ -61,9 +77,27 @@ export default function Triggers() {
         </div>
       )}
 
-      <div className="page-header">
-        <h1 className="page-title">Painel de Triggers e Regras</h1>
-        <p className="page-subtitle">Gerencie as regras de automação e limites mínimos de estoque para reposição</p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <h1 className="page-title">Painel de Triggers e Regras</h1>
+          <p className="page-subtitle">Gerencie as regras de automação e limites mínimos de estoque para reposição</p>
+        </div>
+        {can('ADMIN', 'TI') && (
+          <button
+            className="btn btn-primary"
+            onClick={triggerTestAlerts}
+            disabled={triggering}
+          >
+            {triggering ? (
+              <>
+                <div className="spinner" style={{ width: 14, height: 14, marginRight: 6 }}></div>
+                Enviando...
+              </>
+            ) : (
+              'Testar Envio de Alertas por E-mail'
+            )}
+          </button>
+        )}
       </div>
 
       {config && (

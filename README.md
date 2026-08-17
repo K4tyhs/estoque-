@@ -1,4 +1,4 @@
-# MVP ESTOQUE — Sistema de Automação e Gestão Preditiva de Estoque de TI (Farmarcas)
+# ESTOQUE — Sistema de Automação e Gestão Preditiva de Estoque de TI (Farmarcas)
 
 Aplicação web Full Stack construída para gerenciar o estoque de TI da empresa (300 colaboradores), com automação de baixas via Webhooks (JIRA e WhatsApp), alertas por e-mail, criação de tarefas de compra no JIRA e algoritmo preditivo de reposição.
 
@@ -58,12 +58,15 @@ C:\Users\katiely.silva_farmar\Desktop\MVP ESTOQUE
 
 ## 🔑 Credenciais de Acesso (Seed)
 
-| Perfil | E-mail | Senha Padrão | Permissões |
+> [!NOTE]
+> As senhas padrão para desenvolvimento e teste não estão mais expostas no código e devem ser configuradas no arquivo `backend/.env`.
+
+| Perfil | E-mail | Variável no `.env` | Permissões |
 |---|---|---|---|
-| **Admin Master** | `admin@farmarcas.com.br` | `MASter@0102` | Acesso total, Triggers, Gestão de Usuários, Estoque |
-| **TI** | `katiely.silva@farmarcas.com.br` | `TI@farmarcas2024` | Gestão de Estoque (adicionar, editar, remover, movimentar), Pedidos, Alertas, Relatórios |
-| **TI** | `ti@farmarcas.com.br` | `TI@farmarcas2024` | Gestão de Estoque (adicionar, editar, remover, movimentar), Pedidos, Alertas, Relatórios |
-| **Patrimônio** | `patrimonio@farmarcas.com.br` | `Patrimonio@2024` | Visualização de estoque e relatórios |
+| **Admin Master** | `admin@farmarcas.com.br` | `SEED_ADMIN_PASSWORD` | Acesso total, Triggers, Gestão de Usuários, Estoque |
+| **TI** | `katiely.silva@farmarcas.com.br` | `SEED_TI_PASSWORD` | Gestão de Estoque, Pedidos, Alertas, Relatórios |
+| **TI** | `ti@farmarcas.com.br` | `SEED_TI_PASSWORD` | Gestão de Estoque, Pedidos, Alertas, Relatórios |
+| **Patrimônio** | `patrimonio@farmarcas.com.br` | `SEED_PATRIMONIO_PASSWORD` | Visualização de estoque e relatórios |
 
 ---
 

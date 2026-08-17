@@ -27,13 +27,23 @@ async function seed() {
     VALUES (1, 0, 45, 0, 0)
   `).run();
 
+    // Read passwords from environment
+    const adminPass = process.env.SEED_ADMIN_PASSWORD;
+    const tiPass = process.env.SEED_TI_PASSWORD;
+    const patrimonioPass = process.env.SEED_PATRIMONIO_PASSWORD;
+
+    if (!adminPass || !tiPass || !patrimonioPass) {
+        console.error('❌ Erro: As senhas de seed (SEED_ADMIN_PASSWORD, SEED_TI_PASSWORD, SEED_PATRIMONIO_PASSWORD) não foram definidas no arquivo .env');
+        process.exit(1);
+    }
+
     // Admin
-    const adminHash = await bcrypt.hash('MASter@0102', 12);
+    const adminHash = await bcrypt.hash(adminPass, 12);
     const adminResult = db.prepare(`
-    INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)
+    INSERT INTO users (name, email, password_hash, role, password_changed_at) VALUES (?, ?, ?, ?, datetime('now'))
   `).run('Administrador Master', 'admin@farmarcas.com.br', adminHash, 'ADMIN');
     const adminId = adminResult.lastInsertRowid;
-    console.log('✅ Admin criado: admin@farmarcas.com.br / MASter@0102');
+    console.log('✅ Admin criado: admin@farmarcas.com.br (Senha carregada do .env)');
 
     // TI users
     const tiUsers = [
@@ -41,11 +51,11 @@ async function seed() {
         { email: 'ti@farmarcas.com.br', name: 'Equipe TI' },
     ];
     for (const u of tiUsers) {
-        const h = await bcrypt.hash('TI@farmarcas2024', 12);
-        db.prepare(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`).run(u.name, u.email, h, 'TI');
+        const h = await bcrypt.hash(tiPass, 12);
+        db.prepare(`INSERT INTO users (name, email, password_hash, role, password_changed_at) VALUES (?, ?, ?, ?, datetime('now'))`).run(u.name, u.email, h, 'TI');
         db.prepare(`INSERT INTO authorized_emails (email, role, name, created_by) VALUES (?, ?, ?, ?)`).run(u.email, 'TI', u.name, adminId);
     }
-    console.log('✅ Usuários TI criados (senha: TI@farmarcas2024)');
+    console.log('✅ Usuários TI criados (Senha carregada do .env)');
 
     // Patrimônio users
     const patrimonioUsers = [
@@ -53,11 +63,11 @@ async function seed() {
         { email: 'compras@farmarcas.com.br', name: 'Compras Patrimônio' },
     ];
     for (const u of patrimonioUsers) {
-        const h = await bcrypt.hash('Patrimonio@2024', 12);
-        db.prepare(`INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)`).run(u.name, u.email, h, 'PATRIMONIO');
+        const h = await bcrypt.hash(patrimonioPass, 12);
+        db.prepare(`INSERT INTO users (name, email, password_hash, role, password_changed_at) VALUES (?, ?, ?, ?, datetime('now'))`).run(u.name, u.email, h, 'PATRIMONIO');
         db.prepare(`INSERT INTO authorized_emails (email, role, name, created_by) VALUES (?, ?, ?, ?)`).run(u.email, 'PATRIMONIO', u.name, adminId);
     }
-    console.log('✅ Usuários Patrimônio criados (senha: Patrimonio@2024)');
+    console.log('✅ Usuários Patrimônio criados (Senha carregada do .env)');
 
     // Stock items
     const items = [
@@ -167,11 +177,11 @@ async function seed() {
 
     console.log('\n🎉 Seed concluído com sucesso!');
     console.log('\n📋 Credenciais de acesso:');
-    console.log('   👑 Admin:       admin@farmarcas.com.br        | MASter@0102');
-    console.log('   💻 TI:          katiely.silva@farmarcas.com.br | TI@farmarcas2024');
-    console.log('   💻 TI:          ti@farmarcas.com.br            | TI@farmarcas2024');
-    console.log('   📦 Patrimônio:  patrimonio@farmarcas.com.br    | Patrimonio@2024');
-    console.log('   📦 Patrimônio:  compras@farmarcas.com.br       | Patrimonio@2024');
+    console.log('   👑 Admin:       admin@farmarcas.com.br        | (Definida em SEED_ADMIN_PASSWORD no .env)');
+    console.log('   💻 TI:          katiely.silva@farmarcas.com.br | (Definida em SEED_TI_PASSWORD no .env)');
+    console.log('   💻 TI:          ti@farmarcas.com.br            | (Definida em SEED_TI_PASSWORD no .env)');
+    console.log('   📦 Patrimônio:  patrimonio@farmarcas.com.br    | (Definida em SEED_PATRIMONIO_PASSWORD no .env)');
+    console.log('   📦 Patrimônio:  compras@farmarcas.com.br       | (Definida em SEED_PATRIMONIO_PASSWORD no .env)');
     console.log('\n🚀 Próximo passo: npm run dev');
     process.exit(0);
 }

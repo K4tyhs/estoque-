@@ -1,4 +1,5 @@
 const db = require('../database/db');
+const { checkAndTriggerAlert } = require('../services/alertService');
 
 function getItems(req, res) {
   const items = db.prepare(`
@@ -41,15 +42,34 @@ function createItem(req, res) {
 }
 
 function updateItem(req, res) {
-  const { name, category, description, unit, minimum_quantity } = req.body;
-  const item = db.prepare('SELECT id FROM stock_items WHERE id = ? AND is_active = 1').get(req.params.id);
+  const { name, category, description, unit, current_quantity, minimum_quantity } = req.body;
+  const item = db.prepare('SELECT * FROM stock_items WHERE id = ? AND is_active = 1').get(req.params.id);
   if (!item) return res.status(404).json({ error: 'Item não encontrado' });
+
   db.prepare(`
-    UPDATE stock_items SET name = COALESCE(?, name), category = COALESCE(?, category),
-    description = COALESCE(?, description), unit = COALESCE(?, unit),
-    minimum_quantity = COALESCE(?, minimum_quantity), updated_at = datetime('now')
+    UPDATE stock_items SET 
+      name = ?, 
+      category = ?,
+      description = ?, 
+      unit = ?,
+      current_quantity = ?,
+      minimum_quantity = ?, 
+      updated_at = datetime('now')
     WHERE id = ?
-  `).run(name, category, description, unit, minimum_quantity, req.params.id);
+  `).run(
+    name !== undefined ? name : item.name,
+    category !== undefined ? category : item.category,
+    description !== undefined ? description : item.description,
+    unit !== undefined ? unit : item.unit,
+    current_quantity !== undefined ? current_quantity : item.current_quantity,
+    minimum_quantity !== undefined ? minimum_quantity : item.minimum_quantity,
+    req.params.id
+  );
+
+  // Trigger alert if applicable (async, don't block response)
+  const targetQty = current_quantity !== undefined ? current_quantity : item.current_quantity;
+  checkAndTriggerAlert(req.params.id, targetQty).catch(err => console.error('Erro ao verificar alerta pós-update:', err));
+
   return res.json({ message: 'Item atualizado' });
 }
 
@@ -83,6 +103,11 @@ function manualMove(req, res) {
     VALUES (?, ?, ?, 'MANUAL', ?, ?)
   `).run(item.id, type, quantity, notes || null, req.user.id);
 
+  // Trigger alert if OUT (async, don't block response)
+  if (type === 'OUT') {
+    checkAndTriggerAlert(item.id, newQty, true).catch(err => console.error('Erro ao verificar alerta pós-move:', err));
+  }
+
   return res.json({ message: 'Movimentação registrada', newQuantity: newQty });
 }
 
@@ -102,4 +127,66 @@ function getMovements(req, res) {
   return res.json(db.prepare(query).all(...params));
 }
 
-module.exports = { getItems, getItemById, createItem, updateItem, deleteItem, manualMove, getMovements };
+async function triggerAllAlerts(req, res) {
+  try {
+    const items = db.prepare(`
+      SELECT * FROM stock_items 
+      WHERE current_quantity <= minimum_quantity AND is_active = 1
+    `).all();
+
+    if (items.length === 0) {
+      return res.json({ message: 'Nenhum item com estoque baixo no momento.' });
+    }
+
+    const { calculatePredictiveQuantity } = require('../services/predictiveService');
+    const { sendLowStockAlert } = require('../services/emailService');
+
+    const results = [];
+
+    for (const item of items) {
+      const prediction = calculatePredictiveQuantity(item.id, item.current_quantity, item.minimum_quantity);
+      
+      const pendingOrder = db.prepare(`
+        SELECT id FROM purchase_orders WHERE item_id = ? AND status = 'PENDING'
+      `).get(item.id);
+
+      let purchaseOrderId = pendingOrder ? pendingOrder.id : null;
+      if (!pendingOrder) {
+        const poResult = db.prepare(`
+          INSERT INTO purchase_orders (item_id, predicted_quantity, daily_average, days_since_last_order, coverage_days, trigger_quantity, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+        `).run(item.id, prediction.quantityToOrder, prediction.dailyAverage, prediction.daysSinceLastOrder, prediction.coverageDays, item.current_quantity);
+        purchaseOrderId = poResult.lastInsertRowid;
+      }
+
+      const emailRes = await sendLowStockAlert({
+        itemName: item.name,
+        currentQuantity: item.current_quantity,
+        minimumQuantity: item.minimum_quantity,
+        predictedQuantity: prediction.quantityToOrder,
+        dailyAverage: prediction.dailyAverage,
+        daysSinceLastOrder: prediction.daysSinceLastOrder,
+        coverageDays: prediction.coverageDays,
+      });
+
+      if (emailRes.success) {
+        db.prepare(`UPDATE purchase_orders SET email_sent_at = datetime('now') WHERE id = ?`).run(purchaseOrderId);
+      }
+
+      results.push({
+        itemName: item.name,
+        currentQuantity: item.current_quantity,
+        minimumQuantity: item.minimum_quantity,
+        emailSent: emailRes.success,
+        reason: emailRes.reason || null
+      });
+    }
+
+    return res.json({ message: 'Processamento de alertas concluído', results });
+  } catch (err) {
+    console.error('Erro ao disparar alertas:', err);
+    return res.status(500).json({ error: 'Erro interno ao processar alertas de e-mail.' });
+  }
+}
+
+module.exports = { getItems, getItemById, createItem, updateItem, deleteItem, manualMove, getMovements, triggerAllAlerts };

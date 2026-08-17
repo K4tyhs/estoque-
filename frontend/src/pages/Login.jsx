@@ -114,7 +114,7 @@ export default function Login() {
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 16 }}>
             <FarmarcasLogo width={64} height={64} />
           </div>
-          <div className="login-logo-title">MVP ESTOQUE</div>
+          <div className="login-logo-title">ESTOQUE</div>
           <div className="login-logo-sub">Sistema de Gestão Preditiva de Estoque · TI Farmarcas</div>
         </div>
 

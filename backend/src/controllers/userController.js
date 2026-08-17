@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const db = require('../database/db');
+const { sendAccessApprovalEmail } = require('../services/emailService');
 
 function getUsers(req, res) {
   try {
@@ -29,7 +30,7 @@ async function createUser(req, res) {
 
     const hash = await bcrypt.hash(password, 10);
     const result = db.prepare(
-      'INSERT INTO users (email, password_hash, name, role, is_active) VALUES (?, ?, ?, ?, 1)'
+      "INSERT INTO users (email, password_hash, name, role, is_active, password_changed_at) VALUES (?, ?, ?, ?, 1, datetime('now'))"
     ).run(cleanEmail, hash, name.trim(), role || 'TI');
 
     db.prepare('INSERT OR IGNORE INTO authorized_emails (email, role, name) VALUES (?, ?, ?)').run(cleanEmail, role || 'TI', name.trim());
@@ -79,7 +80,7 @@ function getAuthorizedEmails(req, res) {
   }
 }
 
-function addAuthorizedEmail(req, res) {
+async function addAuthorizedEmail(req, res) {
   try {
     const { email, role, name } = req.body;
     if (!email) return res.status(400).json({ error: 'E-mail é obrigatório' });
@@ -92,6 +93,11 @@ function addAuthorizedEmail(req, res) {
     const result = db.prepare(
       'INSERT INTO authorized_emails (email, role, name) VALUES (?, ?, ?)'
     ).run(cleanEmail, role || 'TI', name ? name.trim() : '');
+
+    const userName = name ? name.trim() : cleanEmail.split('@')[0];
+    sendAccessApprovalEmail(cleanEmail, userName).catch(err => {
+      console.error('Erro ao enviar e-mail de aprovação de acesso:', err);
+    });
 
     return res.status(201).json({ id: result.lastInsertRowid, email: cleanEmail, role: role || 'TI', name });
   } catch (err) {
@@ -121,7 +127,7 @@ function getAccessRequests(req, res) {
   }
 }
 
-function approveAccessRequest(req, res) {
+async function approveAccessRequest(req, res) {
   try {
     const { id } = req.params;
     const reqItem = db.prepare('SELECT * FROM access_requests WHERE id = ?').get(id);
@@ -134,6 +140,10 @@ function approveAccessRequest(req, res) {
     db.prepare(
       'INSERT OR IGNORE INTO authorized_emails (email, role, name) VALUES (?, ?, ?)'
     ).run(reqItem.email, reqItem.role || 'TI', reqItem.name || '');
+
+    sendAccessApprovalEmail(reqItem.email, reqItem.name || reqItem.email.split('@')[0]).catch(err => {
+      console.error('Erro ao enviar e-mail de aprovação de acesso:', err);
+    });
 
     return res.json({ message: 'Solicitação aprovada e e-mail pré-autorizado com sucesso!' });
   } catch (err) {
